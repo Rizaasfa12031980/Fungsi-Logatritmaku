@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Pembelajaran Logaritma</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome untuk Ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Dependencies Recharts (prop-types & Recharts) -->
+    <script crossorigin src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script crossorigin src="https://unpkg.com/recharts@2.12.0/umd/Recharts.js"></script>
+
+    <!-- Babel untuk JSX Compiler di Browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Animasi Transisi Halus (Pengganti Framer Motion) */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .animate-zoom-in { animation: zoomIn 0.3s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-[#e0f2fe] text-slate-800 font-sans pb-32">
+    <!-- Root Container untuk React -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } = window.Recharts;
+
+        // --- Konfigurasi Gaya Neomorphism ---
+        const neoConvex = "bg-[#e0f2fe] shadow-[8px_8px_16px_#beceda,-8px_-8px_16px_#ffffff]";
+        const neoConcave = "bg-[#e0f2fe] shadow-[inset_8px_8px_16px_#beceda,inset_-8px_-8px_16px_#ffffff]";
+        const neoButton = "active:shadow-[inset_4px_4px_8px_#beceda,inset_-4px_-4px_8px_#ffffff] transition-all duration-200";
+
+        // Komponen Utama Aplikasi
+        const App = () => {
+          const [activeTab, setActiveTab] = useState('beranda');
+
+          return (
+            <div className="min-h-screen">
+              {/* Navigasi */}
+              <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-3xl flex gap-1 md:gap-3 ${neoConvex} border border-white/40 max-w-[95vw] overflow-x-auto`}>
+                <NavItem icon="fa-home" label="Beranda" active={activeTab === 'beranda'} onClick={() => setActiveTab('beranda')} />
+                <NavItem icon="fa-book-open" label="Materi" active={activeTab === 'materi'} onClick={() => setActiveTab('materi')} />
+                <NavItem icon="fa-chart-line" label="Simulasi" active={activeTab === 'simulasi'} onClick={() => setActiveTab('simulasi')} />
+                <NavItem icon="fa-file-alt" label="Kuis" active={activeTab === 'latihan'} onClick={() => setActiveTab('latihan')} />
+                <NavItem icon="fa-gamepad" label="Games" active={activeTab === 'games'} onClick={() => setActiveTab('games')} />
+                <NavItem icon="fa-user" label="Profil" active={activeTab === 'profil'} onClick={() => setActiveTab('profil')} />
+              </nav>
+
+              <main className="container mx-auto px-4 pt-10">
+                {activeTab === 'beranda' && <Beranda setTab={setActiveTab} />}
+                {activeTab === 'materi' && <Materi />}
+                {activeTab === 'simulasi' && <Simulasi />}
+                {activeTab === 'latihan' && <Latihan />}
+                {activeTab === 'games' && <Games />}
+                {activeTab === 'profil' && <Profil />}
+              </main>
+
+              <footer className="mt-20 py-10 border-t border-blue-200 text-center text-sm opacity-60">
+                <p>Dikembangkan oleh <span className="font-bold text-pink-600">Riza Asfa</span> | Guru Matematika SMAN 2 Harau</p>
+              </footer>
+            </div>
+          );
+        };
+
+        // Komponen Nav Item
+        const NavItem = ({ icon, label, active, onClick }) => (
+          <button 
+            onClick={onClick}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all min-w-[64px] ${active ? neoConcave + ' text-pink-600' : 'hover:bg-white/30 text-slate-500'}`}
+          >
+            <i className={`fas ${icon} text-lg`}></i>
+            <span className="text-[10px] font-bold uppercase tracking-tighter leading-none mt-1">{label}</span>
+          </button>
+        );
+
+        // Komponen Card
+        const Card = ({ children, className = "", type = "blue", onClick }) => (
+          <div onClick={onClick} className={`p-6 rounded-3xl ${type === 'pink' ? 'bg-[#fdf2f8] shadow-[8px_8px_16px_#d7ced3,-8px_-8px_16px_#ffffff]' : neoConvex} ${className}`}>
+            {children}
+          </div>
+        );
+
+        // --- FITUR AUDIO (Web Speech API) ---
+        const AudioPlayer = ({ text }) => {
+          const [isPlaying, setIsPlaying] = useState(false);
+
+          const playAudio = () => {
+            if (isPlaying) {
+              window.speechSynthesis.cancel();
+              setIsPlaying(false);
+              return;
+            }
+            if ('speechSynthesis' in window) {
+              const utterance = new SpeechSynthesisUtterance(text);
+              utterance.lang = 'id-ID'; // Bahasa Indonesia
+              utterance.rate = 0.9; // Kecepatan bicara
+              utterance.onend = () => setIsPlaying(false);
+              
+              setIsPlaying(true);
+              window.speechSynthesis.speak(utterance);
+            } else {
+              alert("Maaf, browser Anda tidak mendukung fitur audio.");
+            }
+          };
+
+          return (
+            <button 
+              onClick={playAudio}
+              className={`p-2 px-4 rounded-full ${neoConvex} ${neoButton} text-pink-600 flex items-center gap-2`}
+            >
+              <i className={`fas ${isPlaying ? 'fa-stop-circle' : 'fa-volume-up'}`}></i>
+              <span className="text-[10px] font-bold uppercase">{isPlaying ? 'Hentikan Audio' : 'Audio Penjelasan'}</span>
+            </button>
+          );
+        };
+
+        // --- 1. BERANDA ---
+        const Beranda = ({ setTab }) => (
+          <div className="animate-fade-in flex flex-col items-center text-center gap-8 py-10">
+            <div className={`w-32 h-32 rounded-full flex items-center justify-center text-pink-500 ${neoConvex}`}>
+              <i className="fas fa-chart-line text-6xl"></i>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-pink-600 to-blue-600">
+              Fungsi Logaritma Interaktif
+            </h1>
+            <p className="max-w-2xl text-lg opacity-80 italic">"Menjelajahi konsep matematika dengan sentuhan warna yang menyenangkan."</p>
+            <button onClick={() => setTab('materi')} className="px-10 py-4 rounded-full font-bold text-white bg-gradient-to-r from-pink-500 to-pink-600 hover:scale-105 shadow-lg flex items-center gap-2 group transition-all">
+              Mulai Belajar <i className="fas fa-chevron-right ml-1"></i>
+            </button>
+          </div>
+        );
+
+        // --- 2. MATERI ---
+        const Materi = () => {
+          const [subTab, setSubTab] = useState('konsep');
+          const textLangkah = "Ada tiga langkah utama menggambar grafik logaritma. Pertama, buat tabel bantu nilai x dan y. Kedua, letakkan titik-titik tersebut pada koordinat kartesius. Ketiga, hubungkan titik-titik dengan kurva mulus yang mendekati asimtot sumbu Y.";
+
+          return (
+            <div className="animate-fade-in space-y-8">
+              <div className="flex flex-wrap justify-center gap-3">
+                {[
+                  {id: 'konsep', label: 'Konsep Dasar'},
+                  {id: 'sifat', label: 'Sifat Grafik'},
+                  {id: 'langkah', label: 'Langkah Menggambar'},
+                  {id: 'contoh', label: 'Contoh Soal'}
+                ].map((t) => (
+                  <button 
+                    key={t.id} 
+                    onClick={() => setSubTab(t.id)} 
+                    className={`px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${subTab === t.id ? neoConcave + ' text-pink-600' : neoConvex + ' text-slate-500'}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <Card>
+                {subTab === 'konsep' && (
+                  <div className="animate-zoom-in space-y-6">
+                    <h2 className="text-2xl font-bold text-pink-600">Apa itu Logaritma?</h2>
+                    <p className="text-lg leading-relaxed text-slate-700">
+                      Logaritma merupakan <b>invers (kebalikan)</b> dari pemangkatan atau eksponen. 
+                    </p>
+                    <div className={`p-8 rounded-2xl ${neoConcave} text-center font-mono text-2xl text-pink-700 bg-pink-50/50 border border-white/40`}>
+                      a<sup>c</sup> = b ⟺ <sup>a</sup>log b = c
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-4">
+                       <Card className="text-center p-4 bg-white/20" type="pink">
+                          <p className="text-xs font-bold opacity-50 uppercase">a</p>
+                          <p className="font-bold">Basis</p>
+                       </Card>
+                       <Card className="text-center p-4 bg-white/20" type="pink">
+                          <p className="text-xs font-bold opacity-50 uppercase">b</p>
+                          <p className="font-bold">Numerus</p>
+                       </Card>
+                       <Card className="text-center p-4 bg-white/20" type="pink">
+                          <p className="text-xs font-bold opacity-50 uppercase">c</p>
+                          <p className="font-bold">Hasil</p>
+                       </Card>
+                    </div>
+                  </div>
+                )}
+
+                {subTab === 'sifat' && (
+                  <div className="animate-zoom-in space-y-6">
+                    <h2 className="text-2xl font-bold text-blue-600">Sifat-Sifat Grafik</h2>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white/40 rounded-lg border-l-4 border-pink-400">
+                          <h4 className="font-bold text-pink-700 uppercase text-xs mb-1">Titik Potong</h4>
+                          <p className="text-sm">Selalu melalui titik <b>(1, 0)</b> karena <sup>a</sup>log 1 = 0.</p>
+                        </div>
+                        <div className="p-4 bg-white/40 rounded-lg border-l-4 border-pink-400">
+                          <h4 className="font-bold text-pink-700 uppercase text-xs mb-1">Asimtot</h4>
+                          <p className="text-sm">Memiliki <b>asimtot tegak</b> di Sumbu Y (garis x=0).</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white/40 rounded-lg border-l-4 border-blue-400">
+                          <h4 className="font-bold text-blue-700 uppercase text-xs mb-1">Domain & Range</h4>
+                          <p className="text-sm">Domain: x {">"} 0. Range: Semua bilangan real.</p>
+                        </div>
+                        <div className="p-4 bg-white/40 rounded-lg border-l-4 border-blue-400">
+                          <h4 className="font-bold text-blue-700 uppercase text-xs mb-1">Monotonitas</h4>
+                          <p className="text-sm">Naik jika a {">"} 1, Turun jika 0 {"<"} a {"<"} 1.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {subTab === 'langkah' && (
+                  <div className="animate-zoom-in space-y-8">
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-2xl font-bold text-pink-600 flex items-center gap-2"><i className="fas fa-pen"></i> Langkah Menggambar</h2>
+                      <AudioPlayer text={textLangkah} />
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 gap-8 items-center">
+                      <div className="space-y-4">
+                        {[
+                          {step: 1, title: "Buat Tabel Bantu", desc: "Pilih nilai x yang merupakan hasil pangkat dari basis agar nilai y (logaritma) bulat."},
+                          {step: 2, title: "Plot Titik Koordinat", desc: "Letakkan pasangan (x, y) dari tabel ke dalam bidang Kartesius secara akurat."},
+                          {step: 3, title: "Hubungkan Kurva", desc: "Hubungkan titik dengan garis lengkung. Ingat, kurva tidak boleh menyentuh Sumbu Y (asimtot)."}
+                        ].map((s) => (
+                          <div key={s.step} className="flex gap-4 items-start">
+                            <div className="w-8 h-8 rounded-full bg-pink-500 text-white flex-shrink-0 flex items-center justify-center font-bold text-sm shadow-md">{s.step}</div>
+                            <div>
+                              <h4 className="font-bold text-slate-800">{s.title}</h4>
+                              <p className="text-sm text-slate-600">{s.desc}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className={`h-[280px] p-4 rounded-3xl ${neoConcave}`}>
+                        <p className="text-[10px] font-bold text-center mb-2 opacity-50 uppercase italic">Ilustrasi Kurva Mulus f(x) = ²log x</p>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={[{x:0.25,y:-2},{x:0.5,y:-1},{x:1,y:0},{x:2,y:1},{x:4,y:2}]}>
+                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                            <XAxis dataKey="x" type="number" />
+                            <YAxis />
+                            <ReferenceLine x={0} stroke="#f472b6" strokeDasharray="5 5" />
+                            <Line type="monotone" dataKey="y" stroke="#db2777" strokeWidth={3} dot={{r:4, fill:'#db2777'}} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6 pt-4">
+                      <Card className="bg-white/40 border-l-4 border-pink-500" type="pink">
+                         <h4 className="font-bold text-pink-700 flex items-center gap-2 mb-3">
+                            <i className="fas fa-crosshairs"></i> Menentukan Titik Potong
+                         </h4>
+                         <p className="text-sm text-slate-700 mb-3">Syarat utama grafik memotong sumbu X adalah ketika nilai <b>y = 0</b>.</p>
+                         <div className="bg-white/60 p-3 rounded-lg font-mono text-sm text-center text-pink-800 shadow-sm border border-pink-100">
+                           y = ᵃlog x <br/>
+                           0 = ᵃlog x <br/>
+                           x = a⁰ ⟹ <b>x = 1</b>
+                         </div>
+                         <p className="text-sm text-slate-700 mt-3 leading-relaxed">
+                           Jadi, grafik memotong sumbu X di <b>(1, 0)</b>.
+                         </p>
+                      </Card>
+                      
+                      <Card className="bg-white/40 border-l-4 border-blue-500">
+                         <h4 className="font-bold text-blue-700 flex items-center gap-2 mb-3">
+                            <i className="fas fa-arrows-alt-v"></i> Menentukan Asimtot
+                         </h4>
+                         <p className="text-sm text-slate-700 mb-3">Asimtot adalah garis maya yang didekati kurva saat numerus mendekati <b>0</b>.</p>
+                         <div className="bg-white/60 p-3 rounded-lg font-mono text-sm text-center text-blue-800 shadow-sm border border-blue-100">
+                           Syarat numerus: x &gt; 0 <br/>
+                           Batas asimtot: <b>x = 0</b>
+                         </div>
+                         <p className="text-sm text-slate-700 mt-3 leading-relaxed">
+                           Jadi, garis <b>x = 0</b> (Sumbu Y) adalah asimtot tegaknya.
+                         </p>
+                      </Card>
+                    </div>
+
+                    <div className="space-y-4 pt-4 border-t border-blue-200">
+                      <h3 className="font-bold text-blue-800 flex items-center gap-2">
+                         <i className="fas fa-tasks text-blue-500"></i>
+                         Detail Tabel Titik Bantu: f(x) = ²log x
+                      </h3>
+                      <p className="text-sm text-slate-600 bg-white/50 p-3 rounded-xl border border-blue-100">
+                         💡 <b>Tips:</b> Untuk memudahkan, tentukan nilai <b>y</b> (hasil/pangkat) terlebih dahulu. Kemudian cari <b>x</b> dengan bentuk: <b>x = a<sup>y</sup></b>.
+                      </p>
+                      <div className="overflow-x-auto rounded-xl border border-blue-200 shadow-sm">
+                         <table className="w-full text-sm text-center bg-white/40">
+                           <thead className="bg-blue-100/60">
+                             <tr>
+                               <th className="p-3 border border-blue-200">Nilai y</th>
+                               <th className="p-3 border border-blue-200 text-blue-700">Hitung x = 2<sup>y</sup></th>
+                               <th className="p-3 border border-blue-200">Nilai x</th>
+                               <th className="p-3 border border-blue-200 text-pink-600">Koordinat (x, y)</th>
+                             </tr>
+                           </thead>
+                           <tbody>
+                             {[
+                               { y: -2, calc: "2⁻²", x: "1/4", coord: "(1/4, -2)" },
+                               { y: -1, calc: "2⁻¹", x: "1/2", coord: "(1/2, -1)" },
+                               { y: 0, calc: "2⁰", x: "1", coord: "(1, 0)" },
+                               { y: 1, calc: "2¹", x: "2", coord: "(2, 1)" },
+                               { y: 2, calc: "2²", x: "4", coord: "(4, 2)" },
+                               { y: 3, calc: "2³", x: "8", coord: "(8, 3)" }
+                             ].map((row, idx) => (
+                               <tr key={idx} className="hover:bg-white/60 transition-colors">
+                                 <td className="p-2 border border-blue-100">{row.y}</td>
+                                 <td className="p-2 border border-blue-100 font-mono text-blue-700">{row.calc}</td>
+                                 <td className="p-2 border border-blue-100 font-semibold">{row.x}</td>
+                                 <td className="p-2 border border-blue-100 font-bold text-pink-600">{row.coord}</td>
+                               </tr>
+                             ))}
+                           </tbody>
+                         </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {subTab === 'contoh' && <ContohSoalTerpadu />}
+              </Card>
+            </div>
+          );
+        };
+
+        // --- KOMPONEN CONTOH SOAL ---
+        const ContohSoalTerpadu = () => {
+          const [soalIdx, setSoalIdx] = useState(0);
+          
+          const dataContoh = [
+            { id: 1, judul: "Fungsi Logaritma Monoton Naik", soal: "f(x) = ²log x", langkah: ["Tentukan tabel nilai x: (1/4, -2), (1/2, -1), (1, 0), (2, 1), (4, 2).", "Karena basis 2 > 1, kurva naik ke kanan."], points: [{x:0.25,y:-2}, {x:0.5,y:-1}, {x:1,y:0}, {x:2,y:1}, {x:4,y:2}], color: "#db2777", type: "Naik", asimtot: 0 },
+            { id: 2, judul: "Fungsi Logaritma Monoton Turun", soal: "f(x) = ¹/²log x", langkah: ["Tentukan tabel nilai x: (1/4, 2), (1/2, 1), (1, 0), (2, -1), (4, -2).", "Karena basis 1/2 < 1, kurva turun ke kanan."], points: [{x:0.25,y:2}, {x:0.5,y:1}, {x:1,y:0}, {x:2,y:-1}, {x:4,y:-2}], color: "#3b82f6", type: "Turun", asimtot: 0 },
+            { id: 3, judul: "Fungsi Logaritma Basis 3", soal: "f(x) = ³log x", langkah: ["Pilih nilai x yang merupakan perpangkatan 3: (1/3, -1), (1, 0), (3, 1), (9, 2).", "Kurva memotong sumbu X di (1,0)."], points: [{x:0.33,y:-1}, {x:1,y:0}, {x:3,y:1}, {x:9,y:2}], color: "#10b981", type: "Naik", asimtot: 0 },
+            { id: 4, judul: "Pergeseran Horizontal", soal: "f(x) = ²log (x + 1)", langkah: ["Syarat numerus x + 1 > 0, sehingga x > -1. Asimtot bergeser ke x = -1.", "Titik potong sumbu X di x = 0."], points: [{x:-0.5,y:-1}, {x:0,y:0}, {x:1,y:1}, {x:3,y:2}, {x:7,y:3}], color: "#8b5cf6", type: "Naik", asimtot: -1 },
+            { id: 5, judul: "Pergeseran Vertikal", soal: "f(x) = ²log x + 1", langkah: ["Tentukan titik bantu dari f(x) = ²log x.", "Tambahkan 1 pada setiap nilai y. Grafik bergeser ke atas."], points: [{x:0.5,y:0}, {x:1,y:1}, {x:2,y:2}, {x:4,y:3}, {x:8,y:4}], color: "#f59e0b", type: "Naik", asimtot: 0 }
+          ];
+
+          const current = dataContoh[soalIdx];
+
+          return (
+            <div className="animate-zoom-in space-y-6">
+              <div className="flex gap-2 flex-wrap">
+                {dataContoh.map((c, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => setSoalIdx(i)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${soalIdx === i ? 'bg-pink-600 text-white shadow-lg' : neoConvex}`}
+                  >
+                    Contoh {c.id}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid lg:grid-cols-5 gap-6">
+                <div className="lg:col-span-2 space-y-4">
+                  <Card className="bg-white/60 border-l-4 border-pink-500" type="pink">
+                    <h3 className="font-bold text-pink-800 text-lg mb-1">{current.judul}</h3>
+                    <p className="text-sm italic font-mono font-bold">{current.soal}</p>
+                  </Card>
+                  
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1"><i className="fas fa-lightbulb"></i> Analisis</h4>
+                    {current.langkah.map((l, i) => (
+                      <div key={i} className="flex gap-2 text-xs leading-relaxed text-slate-600 p-2 bg-blue-50/50 rounded-lg">
+                        <span className="font-bold text-blue-500">{i+1}.</span> {l}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-3 space-y-4">
+                  <div className={`h-[350px] p-6 rounded-3xl ${neoConcave}`}>
+                     <div className="flex justify-between items-center mb-4">
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Visualisasi Kartesius</span>
+                       <span className={`px-2 py-1 rounded text-[10px] font-bold text-white ${current.type === 'Naik' ? 'bg-green-500' : 'bg-orange-500'}`}>Karakter: {current.type}</span>
+                     </div>
+                     <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={current.points}>
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis dataKey="x" type="number" label={{ value: 'x', position: 'insideRight', offset: -10 }} />
+                          <YAxis label={{ value: 'y', angle: -90, position: 'insideLeft' }} />
+                          <Tooltip />
+                          <ReferenceLine y={0} stroke="#666" />
+                          <ReferenceLine x={current.asimtot} stroke="#f472b6" strokeWidth={2} strokeDasharray="5 5" />
+                          <Line type="monotone" dataKey="y" stroke={current.color} strokeWidth={4} dot={{r:6, fill:current.color, stroke:'#fff', strokeWidth:2}} />
+                        </LineChart>
+                     </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        // --- SIMULASI ---
+        const Simulasi = () => {
+          const [basis, setBasis] = useState(2);
+          const data = useMemo(() => {
+            const pts = [];
+            for (let x = 0.1; x <= 10; x += 0.2) pts.push({ x: parseFloat(x.toFixed(2)), y: Math.log(x) / Math.log(basis) });
+            return pts;
+          }, [basis]);
+          return (
+            <div className="animate-fade-in space-y-8">
+              <Card className="max-w-xl mx-auto text-center space-y-4" type="pink">
+                <h2 className="text-2xl font-bold text-pink-800">Simulasi Dinamis Basis (a)</h2>
+                <input type="range" min="0.2" max="4" step="0.1" value={basis} onChange={e => {if(parseFloat(e.target.value) !== 1) setBasis(parseFloat(e.target.value))}} className="w-full h-3 bg-pink-200 rounded-lg appearance-none cursor-pointer accent-pink-600" />
+                <div className="flex justify-between text-xs font-mono px-2 opacity-50"><span>0.2 (Turun)</span><span>1.0 (X)</span><span>4.0 (Naik)</span></div>
+                <p className="text-4xl font-black text-pink-600 italic">a = {basis}</p>
+                <p className="text-sm font-bold text-blue-800 uppercase">{basis > 1 ? "Grafik Monoton Naik" : "Grafik Monoton Turun"}</p>
+              </Card>
+              <Card className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#beceda" opacity={0.4} />
+                    <XAxis dataKey="x" domain={[0, 10]} />
+                    <YAxis domain={[-4, 4]} />
+                    <ReferenceLine y={0} stroke="#999" />
+                    <ReferenceLine x={0} stroke="#999" />
+                    <Line type="monotone" dataKey="y" stroke="#db2777" strokeWidth={3} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+          );
+        };
+
+        // --- KUIS ---
+        const Latihan = () => {
+          const [quizStep, setQuizStep] = useState('intro');
+          const [userData, setUserData] = useState({ nama: '', kelas: '' });
+          const [currentQuestion, setCurrentQuestion] = useState(0);
+          const [score, setScore] = useState(0);
+          const [selectedAnswer, setSelectedAnswer] = useState(null);
+          const [userAnswers, setUserAnswers] = useState([]);
+
+          const questions = [
+            { q: "Nilai dari ²log 32 adalah...", options: ["3", "4", "5", "6"], correct: 2 },
+            { q: "Jika ³log x = 4, maka nilai x adalah...", options: ["12", "64", "81", "27"], correct: 2 },
+            { q: "Bentuk eksponen dari ⁵log 25 = 2 adalah...", options: ["2⁵ = 25", "5² = 25", "25² = 5", "5 x 2 = 10"], correct: 1 },
+            { q: "Syarat numerus x pada fungsi f(x) = ᵃlog x adalah...", options: ["x > 0", "x ≥ 0", "x < 0", "Semua x"], correct: 0 },
+            { q: "Perhatikan grafik berikut. Fungsi logaritma yang tepat untuk grafik yang monoton turun tersebut adalah...", options: ["f(x) = ²log x", "f(x) = ¹/²log x", "f(x) = ³log x", "f(x) = 10ˣ"], correct: 1, chart: { basis: 0.5 } },
+            { q: "Berdasarkan grafik di atas, jika basis a > 1 (contoh: a = 2), maka sifat grafiknya adalah...", options: ["Monoton Naik", "Monoton Turun", "Konstan", "Terputus"], correct: 0, chart: { basis: 2 } },
+            { q: "Nilai dari ⁷log 1 adalah...", options: ["7", "1", "0", "Tidak ada"], correct: 2 },
+            { q: "Hasil dari ²log 4 + ²log 8 adalah...", options: ["5", "6", "12", "32"], correct: 0 },
+            { q: "Perhatikan garis putus-putus pada grafik f(x) = ²log x di atas. Garis asimtot tegak tersebut berada pada persamaan...", options: ["x = 1", "y = 1", "x = 0", "y = 0"], correct: 2, chart: { basis: 2, showAsymptote: true } },
+            { q: "Berdasarkan grafik di atas, kurva fungsi logaritma selalu memotong sumbu X pada titik koordinat yang ditandai, yaitu...", options: ["(0, 1)", "(1, 0)", "(2, 1)", "(0, 0)"], correct: 1, chart: { basis: 3, highlightPoint: true } }
+          ];
+
+          const renderQuizChart = (chartConfig) => {
+            if (!chartConfig) return null;
+            const pts = [];
+            for (let x = 0.1; x <= 8; x += 0.2) {
+              pts.push({ x: parseFloat(x.toFixed(2)), y: Math.log(x) / Math.log(chartConfig.basis) });
+            }
+            return (
+              <div className={`h-[220px] md:h-[280px] w-full rounded-2xl ${neoConcave} p-4 mb-6 bg-white/30 border border-blue-100`}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={pts} margin={{ top: 15, right: 20, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.4} stroke="#beceda" />
+                    <XAxis dataKey="x" type="number" domain={[0, 8]} tick={{fontSize: 12}} />
+                    <YAxis domain={[-3, 3]} tick={{fontSize: 12}} />
+                    <ReferenceLine y={0} stroke="#666" />
+                    {chartConfig.showAsymptote ? (
+                      <ReferenceLine x={0} stroke="#db2777" strokeDasharray="5 5" strokeWidth={3} label={{ position: 'top', value: 'Asimtot (x=0)', fill: '#db2777', fontWeight: 'bold' }} />
+                    ) : <ReferenceLine x={0} stroke="#666" />}
+                    <Line type="monotone" dataKey="y" stroke="#db2777" strokeWidth={4} dot={false} isAnimationActive={false} />
+                    {chartConfig.highlightPoint && <ReferenceDot x={1} y={0} r={8} fill="#db2777" stroke="#fff" strokeWidth={2} />}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          };
+
+          const handleAnswer = () => {
+            const isCorrect = selectedAnswer === questions[currentQuestion].correct;
+            setUserAnswers([...userAnswers, { question: questions[currentQuestion].q, userAns: questions[currentQuestion].options[selectedAnswer], correctAns: questions[currentQuestion].options[questions[currentQuestion].correct], isCorrect }]);
+            if (isCorrect) setScore(score + 10);
+            if (currentQuestion < questions.length - 1) {
+              setCurrentQuestion(currentQuestion + 1);
+              setSelectedAnswer(null);
+            } else {
+              setQuizStep('result');
+            }
+          };
+
+          if (quizStep === 'intro') return (
+            <div className="animate-zoom-in max-w-md mx-auto py-10">
+              <Card type="pink" className="text-center space-y-6">
+                <i className="fas fa-file-alt text-4xl text-pink-600"></i>
+                <h2 className="text-2xl font-bold text-pink-800">Kuis Logaritma</h2>
+                <div className="space-y-4 text-left">
+                  <input type="text" placeholder="Nama..." className={`w-full p-4 rounded-2xl ${neoConcave}`} value={userData.nama} onChange={e => setUserData({...userData, nama: e.target.value})} />
+                  <input type="text" placeholder="Kelas..." className={`w-full p-4 rounded-2xl ${neoConcave}`} value={userData.kelas} onChange={e => setUserData({...userData, kelas: e.target.value})} />
+                </div>
+                <button onClick={() => userData.nama && setQuizStep('quiz')} className="w-full py-4 rounded-2xl font-bold text-white bg-pink-600">Mulai Kuis</button>
+              </Card>
+            </div>
+          );
+
+          if (quizStep === 'result') return (
+            <div className="animate-fade-in max-w-4xl mx-auto py-10">
+              <div className="grid md:grid-cols-3 gap-6">
+                <Card type="pink" className="text-center space-y-6 h-fit sticky top-10">
+                  <i className="fas fa-trophy text-6xl text-yellow-500"></i>
+                  <h2 className="text-2xl font-bold text-pink-800">Skor: {score}</h2>
+                  <button onClick={() => {setQuizStep('intro'); setUserAnswers([]); setScore(0); setCurrentQuestion(0);}} className="w-full py-3 border-2 border-pink-600 text-pink-600 font-bold rounded-xl">Coba Lagi</button>
+                </Card>
+                <div className="md:col-span-2 space-y-3">
+                  <h3 className="font-bold text-lg text-pink-700">Analisis Jawaban:</h3>
+                  {userAnswers.map((ans, idx) => (
+                    <div key={idx} className={`p-4 rounded-xl bg-white border-l-4 ${ans.isCorrect ? 'border-green-400' : 'border-red-400'}`}>
+                      <p className="text-xs opacity-50">Soal {idx+1}</p>
+                      <p className="text-sm font-semibold">{ans.question}</p>
+                      <div className="text-xs mt-2 flex gap-4">
+                        <span className={ans.isCorrect ? 'text-green-600' : 'text-red-500'}><b>Anda:</b> {ans.userAns}</span>
+                        {!ans.isCorrect && <span className="text-blue-600"><b>Benar:</b> {ans.correctAns}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+
+          return (
+            <div className="animate-fade-in max-w-2xl mx-auto py-6">
+              <div className="flex justify-between items-center mb-4"><span className="font-bold text-blue-900">Soal {currentQuestion+1}/10</span></div>
+              <Card type="pink" className="space-y-6">
+                {renderQuizChart(questions[currentQuestion].chart)}
+                <h3 className="text-lg font-bold text-pink-900">{questions[currentQuestion].q}</h3>
+                <div className="grid gap-3">
+                  {questions[currentQuestion].options.map((opt, i) => (
+                    <button key={i} onClick={() => setSelectedAnswer(i)} className={`p-4 text-left rounded-xl border ${selectedAnswer === i ? 'bg-pink-600 text-white' : 'bg-white/50 text-pink-900'}`}>{opt}</button>
+                  ))}
+                </div>
+                <button disabled={selectedAnswer === null} onClick={handleAnswer} className="w-full py-4 bg-pink-600 text-white font-bold rounded-xl disabled:opacity-30">Selanjutnya</button>
+              </Card>
+            </div>
+          );
+        };
+
+        // --- GAME: TEBAK GRAFIK ---
+        const GameTebak = ({ onBack }) => {
+          const [gameState, setGameState] = useState('menu');
+          const [targetBasis, setTargetBasis] = useState(2);
+          const [options, setOptions] = useState([]);
+          const [feedback, setFeedback] = useState(null);
+          const [gameScore, setGameScore] = useState(0);
+          const [round, setRound] = useState(1);
+          const totalRounds = 5;
+
+          const generateLevel = () => {
+            const pool = [0.2, 0.5, 2, 3, 4, 5];
+            const correct = pool[Math.floor(Math.random() * pool.length)];
+            const distractors = pool.filter(b => b !== correct).sort(() => Math.random() - 0.5).slice(0, 3);
+            const allOptions = [correct, ...distractors].sort(() => Math.random() - 0.5);
+            setTargetBasis(correct); setOptions(allOptions); setFeedback(null);
+          };
+
+          const startGame = () => { setGameScore(0); setRound(1); setGameState('playing'); generateLevel(); };
+
+          const handleGuess = (val) => {
+            if (feedback) return; 
+            if (val === targetBasis) { setFeedback('correct'); setGameScore(prev => prev + 20); } 
+            else setFeedback('wrong');
+            setTimeout(() => { if (round < totalRounds) { setRound(prev => prev + 1); generateLevel(); } else setGameState('over'); }, 1200);
+          };
+
+          const chartData = useMemo(() => {
+            const pts = [];
+            for (let x = 0.1; x <= 10; x += 0.2) pts.push({ x: parseFloat(x.toFixed(2)), y: Math.log(x) / Math.log(targetBasis) });
+            return pts;
+          }, [targetBasis]);
+
+          if (gameState === 'menu') {
+            return (
+              <div className="animate-zoom-in max-w-xl mx-auto">
+                <button onClick={onBack} className="flex items-center gap-2 text-pink-600 font-bold mb-4"><i className="fas fa-arrow-left"></i> Kembali</button>
+                <Card className="text-center py-20" type="pink">
+                  <i className="fas fa-gamepad text-6xl text-pink-500 mb-4"></i>
+                  <h2 className="text-3xl font-black text-pink-800 mb-2">Tebak Grafik Logaritma</h2>
+                  <p className="mb-8 text-slate-600">Tebak nilai basis (a) yang paling tepat. Dapatkan skor setinggi mungkin!</p>
+                  <button onClick={startGame} className={`px-10 py-4 bg-pink-600 text-white rounded-2xl font-bold shadow-lg ${neoButton}`}>Mulai Bermain</button>
+                </Card>
+              </div>
+            );
+          }
+
+          if (gameState === 'over') {
+            return (
+              <div className="animate-zoom-in max-w-md mx-auto">
+                <button onClick={onBack} className="flex items-center gap-2 text-pink-600 font-bold mb-4"><i className="fas fa-arrow-left"></i> Menu Game</button>
+                <Card className="text-center py-16" type="pink">
+                  <i className="fas fa-trophy text-6xl text-yellow-500 mb-4"></i>
+                  <h2 className="text-3xl font-black text-pink-800 mb-4">Selesai!</h2>
+                  <div className={`p-8 rounded-3xl ${neoConcave} bg-pink-50/50 inline-block mb-6`}>
+                    <p className="text-sm font-bold text-slate-500 uppercase">Skor</p>
+                    <p className="text-6xl font-black text-pink-600">{gameScore}</p>
+                  </div>
+                  <button onClick={startGame} className="w-full py-4 bg-white border-2 border-pink-600 text-pink-600 font-bold rounded-2xl">Main Lagi</button>
+                </Card>
+              </div>
+            );
+          }
+
+          return (
+            <div className="animate-fade-in max-w-3xl mx-auto">
+              <button onClick={onBack} className="flex items-center gap-2 text-pink-600 font-bold mb-4"><i className="fas fa-arrow-left"></i> Berhenti</button>
+              <div className="flex justify-between items-center mb-6">
+                <div className="bg-white/60 px-4 py-2 rounded-xl font-bold text-blue-900 shadow-sm">Ronde {round} / {totalRounds}</div>
+                <div className="bg-pink-100 px-4 py-2 rounded-xl font-black text-pink-700 shadow-sm">Skor: {gameScore}</div>
+              </div>
+              <Card type="pink" className="space-y-6 relative overflow-hidden">
+                <h3 className="text-center font-bold text-pink-900 text-lg">Tebak Nilai Basis (a) dari Grafik Ini!</h3>
+                <div className={`h-[350px] w-full rounded-3xl ${neoConcave} p-4 relative bg-white/20`}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} stroke="#beceda" />
+                      <XAxis dataKey="x" hide />
+                      <YAxis domain={[-4, 4]} hide />
+                      <ReferenceLine y={0} stroke="#999" />
+                      <ReferenceLine x={0} stroke="#999" />
+                      <Line type="monotone" dataKey="y" stroke="#db2777" strokeWidth={5} dot={false} isAnimationActive={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  {feedback && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px] rounded-3xl z-10">
+                      {feedback === 'correct' ? <i className="fas fa-check-circle text-8xl text-green-500 bg-white rounded-full"></i> : <i className="fas fa-times-circle text-8xl text-red-500 bg-white rounded-full"></i>}
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+                  {options.map((opt, i) => (
+                    <button key={i} onClick={() => handleGuess(opt)} disabled={feedback !== null} className={`py-5 rounded-2xl font-black text-xl bg-white border-2 border-pink-100 text-pink-700 hover:bg-pink-50 disabled:opacity-50 ${neoButton}`}>a = {opt}</button>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          );
+        };
+
+        // --- GAME: MENJODOHKAN ---
+        const GameJodoh = ({ onBack }) => {
+          const pairs = useMemo(() => [
+            { id: 1, left: "f(x) = ²log x", right: "Monoton naik, memotong sumbu X di (1,0)" },
+            { id: 2, left: "f(x) = ¹/²log x", right: "Monoton turun, memotong sumbu X di (1,0)" },
+            { id: 3, left: "f(x) = ²log(x+1)", right: "Memiliki asimtot tegak di garis x = -1" },
+            { id: 4, left: "Syarat Numerus", right: "Nilai x harus lebih besar dari 0 (x > 0)" },
+            { id: 5, left: "Syarat Basis (a)", right: "a > 0 dan a ≠ 1" }
+          ], []);
+
+          const [leftItems, setLeftItems] = useState([]);
+          const [rightItems, setRightItems] = useState([]);
+          const [selectedLeft, setSelectedLeft] = useState(null);
+          const [selectedRight, setSelectedRight] = useState(null);
+          const [matched, setMatched] = useState([]);
+          const [errorMsg, setErrorMsg] = useState(false);
+
+          useEffect(() => {
+            setLeftItems([...pairs].sort(() => Math.random() - 0.5));
+            setRightItems([...pairs].sort(() => Math.random() - 0.5));
+          }, [pairs]);
+
+          const handleLeftClick = (item) => {
+            if (matched.includes(item.id)) return;
+            setSelectedLeft(item);
+            if (selectedRight) checkMatch(item, selectedRight);
+          };
+
+          const handleRightClick = (item) => {
+            if (matched.includes(item.id)) return;
+            setSelectedRight(item);
+            if (selectedLeft) checkMatch(selectedLeft, item);
+          };
+
+          const checkMatch = (left, right) => {
+            if (left.id === right.id) {
+              setMatched(prev => [...prev, left.id]);
+              setSelectedLeft(null); setSelectedRight(null);
+            } else {
+              setErrorMsg(true);
+              setTimeout(() => { setErrorMsg(false); setSelectedLeft(null); setSelectedRight(null); }, 600);
+            }
+          };
+
+          if (matched.length === pairs.length) {
+            return (
+              <div className="animate-zoom-in max-w-md mx-auto">
+                <button onClick={onBack} className="flex items-center gap-2 text-blue-700 font-bold mb-4"><i className="fas fa-arrow-left"></i> Menu Game</button>
+                <Card className="text-center py-16" type="blue">
+                  <i className="fas fa-trophy text-6xl text-yellow-500 mb-4"></i>
+                  <h2 className="text-3xl font-black text-blue-900 mb-2">Sempurna!</h2>
+                  <p className="text-slate-600 mb-6">Anda berhasil menjodohkan semua pasangan.</p>
+                  <button onClick={() => { setMatched([]); setLeftItems([...pairs].sort(()=>Math.random()-0.5)); setRightItems([...pairs].sort(()=>Math.random()-0.5)); }} className={`w-full py-4 bg-white border-2 border-blue-600 text-blue-600 font-bold rounded-2xl ${neoButton}`}>Main Lagi</button>
+                </Card>
+              </div>
+            );
+          }
+
+          return (
+            <div className="animate-fade-in max-w-4xl mx-auto">
+              <button onClick={onBack} className="flex items-center gap-2 text-blue-700 font-bold mb-4"><i className="fas fa-arrow-left"></i> Kembali</button>
+              <Card className="space-y-6" type="blue">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-black text-blue-900">Menjodohkan Kartu</h2>
+                  <p className="text-slate-600 text-sm">Pilih kartu di sebelah kiri dan cari pasangannya di sebelah kanan!</p>
+                </div>
+                <div className="h-6">
+                   {errorMsg && <p className="text-center text-red-500 font-bold">Pasangan tidak cocok! Coba lagi.</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-4 md:gap-8">
+                  <div className="space-y-4">
+                    {leftItems.map((item) => {
+                      const isMatched = matched.includes(item.id);
+                      const isSelected = selectedLeft?.id === item.id;
+                      return (
+                        <button key={`left-${item.id}`} onClick={() => handleLeftClick(item)} disabled={isMatched} className={`w-full p-4 text-sm md:text-base font-bold rounded-2xl transition-all border-2 text-left flex items-center justify-between ${isMatched ? 'bg-green-100 border-green-400 text-green-700 opacity-50' : isSelected ? 'bg-blue-100 border-blue-500 text-blue-800 scale-[1.02] shadow-md' : 'bg-white border-blue-100 text-slate-700'}`}>
+                          {item.left} {isMatched && <i className="fas fa-check-circle text-green-500"></i>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="space-y-4">
+                    {rightItems.map((item) => {
+                      const isMatched = matched.includes(item.id);
+                      const isSelected = selectedRight?.id === item.id;
+                      return (
+                        <button key={`right-${item.id}`} onClick={() => handleRightClick(item)} disabled={isMatched} className={`w-full p-4 text-sm md:text-base font-medium rounded-2xl transition-all border-2 text-left flex items-center justify-between ${isMatched ? 'bg-green-100 border-green-400 text-green-700 opacity-50' : isSelected ? 'bg-blue-100 border-blue-500 text-blue-800 scale-[1.02] shadow-md' : 'bg-white border-blue-100 text-slate-700'}`}>
+                          {item.right} {isMatched && <i className="fas fa-check-circle text-green-500"></i>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Card>
+            </div>
+          );
+        };
+
+        const Games = () => {
+          const [activeGame, setActiveGame] = useState('menu');
+
+          if (activeGame === 'tebak') return <GameTebak onBack={() => setActiveGame('menu')} />;
+          if (activeGame === 'jodoh') return <GameJodoh onBack={() => setActiveGame('menu')} />;
+
+          return (
+            <div className="animate-fade-in max-w-4xl mx-auto py-6">
+              <div className="text-center mb-10">
+                <h2 className="text-3xl font-black text-pink-800">Pilih Permainan</h2>
+                <p className="text-slate-600 mt-2">Asah pemahamanmu tentang logaritma melalui game interaktif.</p>
+              </div>
+              <div className="grid md:grid-cols-2 gap-8">
+                <Card type="pink" className="text-center space-y-4 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setActiveGame('tebak')}>
+                  <i className="fas fa-chart-line text-6xl text-pink-500"></i>
+                  <h3 className="text-2xl font-bold text-pink-900">Tebak Grafik</h3>
+                  <p className="text-slate-600 text-sm">Tebak nilai basis (a) dari kurva logaritma yang ditampilkan secara acak.</p>
+                  <button onClick={(e) => { e.stopPropagation(); setActiveGame('tebak'); }} className={`w-full py-3 bg-pink-600 text-white rounded-xl font-bold ${neoButton}`}>Mainkan</button>
+                </Card>
+                <Card type="blue" className="text-center space-y-4 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setActiveGame('jodoh')}>
+                  <i className="fas fa-puzzle-piece text-6xl text-blue-500"></i>
+                  <h3 className="text-2xl font-bold text-blue-900">Menjodohkan</h3>
+                  <p className="text-slate-600 text-sm">Pasangkan persamaan fungsi logaritma dengan sifat atau deskripsi grafiknya.</p>
+                  <button onClick={(e) => { e.stopPropagation(); setActiveGame('jodoh'); }} className={`w-full py-3 bg-blue-600 text-white rounded-xl font-bold ${neoButton}`}>Mainkan</button>
+                </Card>
+              </div>
+            </div>
+          );
+        };
+
+        // --- PROFIL ---
+        const Profil = () => (
+          <div className="animate-zoom-in max-w-md mx-auto">
+            <Card className="text-center space-y-4" type="pink">
+              <div className="w-32 h-32 rounded-full bg-pink-100 mx-auto flex items-center justify-center shadow-md overflow-hidden border-4 border-white">
+                <img src="https://i.imgur.com/FKq8IbL.png" alt="Profil Riza Asfa" className="w-full h-full object-cover" />
+              </div>
+              <h2 className="text-2xl font-bold text-pink-900">Riza Asfa</h2>
+              <p className="text-pink-600 font-bold uppercase text-xs">Guru Matematika SMAN 2 Harau</p>
+              <hr className="border-pink-200" />
+              <p className="text-sm text-slate-600 italic">"Membangun generasi cerdas melalui teknologi dan matematika."</p>
+            </Card>
+          </div>
+        );
+
+        // --- RENDER APLIKASI ---
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
